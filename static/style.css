@@ -1,0 +1,144 @@
+/* Custom animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+#results {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Image hover effect */
+.group:hover img {
+    transform: scale(1.05);
+    transition: transform 0.3s ease;
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Collapsible sections */
+.collapsible-content {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: all 0.3s ease-out;
+}
+
+.collapsible-content.expanded {
+    max-height: 5000px;
+    opacity: 1;
+    transition: all 0.5s ease-in;
+}
+
+/* Section header hover effect */
+.section-header {
+    transition: all 0.3s ease;
+}
+
+.section-header:hover {
+    background-color: #f8fafc;
+}
+
+/* Rotate animation for icons */
+.rotate-180 {
+    transform: rotate(180deg);
+    transition: transform 0.3s ease;
+}
+
+/* Card hover effects */
+.hover-card {
+    transition: all 0.3s ease;
+}
+
+.hover-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Input focus effect */
+input:focus {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Button hover effect */
+button:hover {
+    transform: translateY(-1px);
+}
+
+/* Smooth transitions */
+.transition-all {
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+}
+
+/* Source code viewer styles */
+.view-source-btn {
+    @apply px-6 py-3 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-xl 
+           hover:from-indigo-600 hover:to-indigo-700 transition-all duration-300 
+           transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center;
+}
+
+.copy-btn {
+    @apply px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 
+           transition-all duration-300 flex items-center;
+}
+
+#sourceViewer {
+    @apply transition-all duration-300;
+}
+
+#sourceContent {
+    @apply transition-all duration-300;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* Syntax highlighting for code */
+pre {
+    @apply font-mono text-sm;
+}
+
+/* Custom scrollbar for code viewer */
+#sourceContent::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+#sourceContent::-webkit-scrollbar-track {
+    @apply bg-gray-700 rounded;
+}
+
+#sourceContent::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded;
+}
+
+#sourceContent::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500;
+} 

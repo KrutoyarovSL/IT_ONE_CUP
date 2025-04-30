@@ -1,0 +1,59 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_APP=app.py
+      - ML_SERVICE_URL=http://ml:8000
+    volumes:
+      - ./static:/app/static
+      - ./templates:/app/templates
+      - /usr/local/lib/python3.9/site-packages:/usr/local/lib/python3.9/site-packages
+    depends_on:
+      - ml
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  ml:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./model_cache:/app/model_cache
+      - /usr/local/lib/python3.10/site-packages:/usr/local/lib/python3.10/site-packages
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./static:/usr/share/nginx/html/static
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - backend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge 

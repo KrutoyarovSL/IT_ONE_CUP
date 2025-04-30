@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Website Modifier</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 30rem;
+            gap: 2rem;
+            height: 100vh;
+            padding: 2rem;
+        }
+        .main-content {
+            overflow-y: auto;
+            height: 100%;
+        }
+        .chat-panel {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        #chatMessages {
+            max-height: calc(100vh - 12rem);
+            scrollbar-width: thin;
+            scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+        }
+        #chatMessages::-webkit-scrollbar {
+            width: 6px;
+        }
+        #chatMessages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #chatMessages::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 163, 175, 0.5);
+            border-radius: 3px;
+        }
+        #chatMessages > div {
+            max-width: 100% !important;
+            word-wrap: break-word;
+        }
+        #chatMessages pre {
+            max-width: 100%;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 0.5rem 0;
+        }
+        #chatMessages code {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .code-block {
+            position: relative;
+            margin: 1rem 0;
+        }
+        .code-block pre {
+            padding-top: 2.5rem;
+        }
+        .code-block::before {
+            content: attr(data-language);
+            position: absolute;
+            top: 0.5rem;
+            left: 1rem;
+            font-size: 0.8rem;
+            color: #666;
+            z-index: 1;
+        }
+        .user-message {
+            background-color: #f3f4f6;
+            margin-left: auto;
+            border-radius: 1rem 1rem 0 1rem;
+        }
+        .assistant-message {
+            background-color: #eff6ff;
+            margin-right: auto;
+            border-radius: 1rem 1rem 1rem 0;
+        }
+        .message-content {
+            padding: 1rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .preview-container {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ddd;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+        .preview-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .preview-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 5px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .template-card {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .template-card:hover {
+            transform: translateY(-5px);
+        }
+        .template-card.selected {
+            border: 2px solid #007bff;
+        }
+        #previewContainer {
+            transition: all 0.3s ease;
+        }
+        #previewContainer.maximized {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            background: white;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+    <div class="main-container">
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="text-center mb-12">
+                <h1 class="text-5xl font-bold text-gray-800 mb-4">AI Website Modifier</h1>
+                <p class="text-gray-600 text-lg">Analyze and modify any website with AI assistance</p>
+            </div>
+            
+            <div class="bg-white rounded-2xl shadow-xl p-8 mb-12 transform hover:scale-[1.01] transition-transform duration-300">
+                <div class="flex space-x-4">
+                    <input type="text" id="urlInput" 
+                           class="flex-1 px-6 py-4 text-lg border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
+                           placeholder="Enter website URL (e.g., example.com)">
+                    <button onclick="parseWebsite()" 
+                            class="px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-lg font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
+                        Parse
+                    </button>
+                </div>
+            </div>
+
+            <!-- Templates Section Moved to Top -->
+            <div class="bg-white rounded-2xl shadow-xl overflow-hidden mb-12">
+                <button class="w-full px-8 py-6 text-left flex justify-between items-center section-header hover:bg-gray-50 transition-colors duration-300" onclick="toggleSection('templates')">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/>
+                            </svg>
+                        </div>
+                        <h2 class="text-2xl font-semibold text-gray-800">Suggested Templates</h2>
+                    </div>
+                    <svg class="w-6 h-6 text-gray-400 transform transition-transform duration-300" id="templatesIcon" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div id="templates" class="collapsible-content px-8 pb-8">
+                    <div id="templatesList" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                </div>
+            </div>
+
+            <div id="loading" class="hidden text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-500"></div>
+                <p class="mt-4 text-gray-600 text-lg">Parsing website...</p>
+            </div>
+
+            <div id="error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-6 rounded-lg mb-8 shadow-lg"></div>
+
+            <div id="results" class="hidden space-y-8">
+                <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+                    <button class="w-full px-8 py-6 text-left flex justify-between items-center section-header hover:bg-gray-50 transition-colors duration-300" onclick="toggleSection('basicInfo')">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <h2 class="text-2xl font-semibold text-gray-800">Basic Information</h2>
+                        </div>
+                        <svg class="w-6 h-6 text-gray-400 transform transition-transform duration-300" id="basicInfoIcon" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div id="basicInfo" class="collapsible-content px-8 pb-8 space-y-4"></div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+                    <button class="w-full px-8 py-6 text-left flex justify-between items-center section-header hover:bg-gray-50 transition-colors duration-300" onclick="toggleSection('sourceCode')">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                                </svg>
+                            </div>
+                            <h2 class="text-2xl font-semibold text-gray-800">Source Code</h2>
+                        </div>
+                        <svg class="w-6 h-6 text-gray-400 transform transition-transform duration-300" id="sourceCodeIcon" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div id="sourceCode" class="collapsible-content px-8 pb-8 space-y-4">
+                        <div class="flex space-x-4">
+                            <button onclick="viewSource('html')" class="view-source-btn">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                                </svg>
+                                View HTML
+                            </button>
+                            <button onclick="viewSource('css')" class="view-source-btn">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                                </svg>
+                                View CSS
+                            </button>
+                            <button onclick="viewSource('js')" class="view-source-btn">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                                </svg>
+                                View JavaScript
+                            </button>
+                        </div>
+                        <div id="sourceViewer" class="mt-4 hidden">
+                            <div class="bg-gray-800 rounded-xl p-4">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-white font-mono" id="sourceTitle"></h3>
+                                    <button onclick="copySource()" class="copy-btn">
+                                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                        </svg>
+                                        Copy
+                                    </button>
+                                </div>
+                                <pre id="sourceContent" class="text-gray-300 font-mono text-sm overflow-x-auto"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+                    <button class="w-full px-8 py-6 text-left flex justify-between items-center section-header hover:bg-gray-50 transition-colors duration-300" onclick="toggleSection('metaTags')">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                                </svg>
+                            </div>
+                            <h2 class="text-2xl font-semibold text-gray-800">Meta Tags</h2>
+                        </div>
+                        <svg class="w-6 h-6 text-gray-400 transform transition-transform duration-300" id="metaTagsIcon" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div id="metaTags" class="collapsible-content px-8 pb-8 space-y-4"></div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+                    <button class="w-full px-8 py-6 text-left flex justify-between items-center section-header hover:bg-gray-50 transition-colors duration-300" onclick="toggleSection('links')">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                                </svg>
+                            </div>
+                            <h2 class="text-2xl font-semibold text-gray-800">Links</h2>
+                        </div>
+                        <svg class="w-6 h-6 text-gray-400 transform transition-transform duration-300" id="linksIcon" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div id="links" class="collapsible-content px-8 pb-8 space-y-4"></div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+                    <button class="w-full px-8 py-6 text-left flex justify-between items-center section-header hover:bg-gray-50 transition-colors duration-300" onclick="toggleSection('scripts')">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                                </svg>
+                            </div>
+                            <h2 class="text-2xl font-semibold text-gray-800">Scripts</h2>
+                        </div>
+                        <svg class="w-6 h-6 text-gray-400 transform transition-transform duration-300" id="scriptsIcon" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div id="scripts" class="collapsible-content px-8 pb-8 space-y-4"></div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+                    <button class="w-full px-8 py-6 text-left flex justify-between items-center section-header hover:bg-gray-50 transition-colors duration-300" onclick="toggleSection('styles')">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-full bg-pink-100 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                                </svg>
+                            </div>
+                            <h2 class="text-2xl font-semibold text-gray-800">Stylesheets</h2>
+                        </div>
+                        <svg class="w-6 h-6 text-gray-400 transform transition-transform duration-300" id="stylesIcon" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div id="styles" class="collapsible-content px-8 pb-8 space-y-4"></div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+                    <button class="w-full px-8 py-6 text-left flex justify-between items-center section-header hover:bg-gray-50 transition-colors duration-300" onclick="toggleSection('images')">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                            </div>
+                            <h2 class="text-2xl font-semibold text-gray-800">Images</h2>
+                        </div>
+                        <svg class="w-6 h-6 text-gray-400 transform transition-transform duration-300" id="imagesIcon" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div id="images" class="collapsible-content px-8 pb-8 grid grid-cols-2 md:grid-cols-3 gap-6"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Panel -->
+        <div class="chat-panel">
+            <div class="bg-white rounded-2xl shadow-xl overflow-hidden h-full flex flex-col">
+                <!-- Chat Header -->
+                <div class="p-4 border-b border-gray-200 flex-shrink-0">
+                    <h2 class="text-xl font-semibold text-gray-800">AI Assistant</h2>
+                    <p class="text-sm text-gray-600">Ask me to modify the code</p>
+                </div>
+
+                <!-- Chat Messages -->
+                <div id="chatMessages" class="flex-1 p-4 overflow-y-auto space-y-4 min-h-0">
+                    <div class="bg-blue-50 p-4 rounded-xl">
+                        <p class="text-gray-800">Hello! I'm your AI assistant. I can help you modify the parsed website code. What would you like to change?</p>
+                    </div>
+                </div>
+
+                <!-- Chat Input -->
+                <div class="p-4 border-t border-gray-200 flex-shrink-0">
+                    <div class="flex space-x-4">
+                        <input type="text" id="chatInput" 
+                               class="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
+                               placeholder="Type your message...">
+                        <button onclick="sendMessage()" 
+                                class="px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300">
+                            Send
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="previewContainer" class="preview-container">
+        <div class="preview-controls">
+            <button class="btn btn-sm btn-primary" onclick="toggleMaximize()">
+                <i class="bi bi-arrows-fullscreen"></i>
+            </button>
+        </div>
+        <iframe id="previewFrame" class="preview-frame"></iframe>
+    </div>
+
+    <script>
+        // Track the state of each section
+        const sectionStates = {
+            basicInfo: true,
+            metaTags: true,
+            links: true,
+            scripts: true,
+            styles: true,
+            images: true,
+            templates: true
+        };
+
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const icon = document.getElementById(sectionId + 'Icon');
+            
+            if (sectionStates[sectionId]) {
+                section.classList.remove('expanded');
+                icon.classList.add('rotate-180');
+            } else {
+                section.classList.add('expanded');
+                icon.classList.remove('rotate-180');
+            }
+            
+            sectionStates[sectionId] = !sectionStates[sectionId];
+        }
+
+        function viewSource(type) {
+            const sourceViewer = document.getElementById('sourceViewer');
+            const sourceTitle = document.getElementById('sourceTitle');
+            const sourceContent = document.getElementById('sourceContent');
+            
+            sourceViewer.classList.remove('hidden');
+            
+            if (type === 'html') {
+                sourceTitle.textContent = 'HTML Source Code';
+                sourceContent.textContent = currentData.html || 'No HTML source available';
+            } else if (type === 'css') {
+                sourceTitle.textContent = 'CSS Source Code';
+                sourceContent.textContent = currentData.css || 'No CSS source available';
+            } else if (type === 'js') {
+                sourceTitle.textContent = 'JavaScript Source Code';
+                sourceContent.textContent = currentData.js || 'No JavaScript source available';
+            }
+        }
+
+        function copySource() {
+            const sourceContent = document.getElementById('sourceContent');
+            navigator.clipboard.writeText(sourceContent.textContent)
+                .then(() => {
+                    const copyBtn = document.querySelector('.copy-btn');
+                    const originalText = copyBtn.innerHTML;
+                    copyBtn.innerHTML = `
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Copied!
+                    `;
+                    setTimeout(() => {
+                        copyBtn.innerHTML = originalText;
+                    }, 2000);
+                });
+        }
+
+        let currentData = {};
+        let currentHtml = '';
+        let currentCss = '';
+        let selectedTemplate = null;
+
+        async function parseWebsite() {
+            const urlInput = document.getElementById('urlInput');
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const results = document.getElementById('results');
+
+            // Reset UI
+            error.classList.add('hidden');
+            results.classList.add('hidden');
+            loading.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/parse', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: urlInput.value }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to parse website');
+                }
+
+                // Store the current data
+                currentData = data;
+                currentHtml = data.html;
+                currentCss = data.css;
+
+                // Display results
+                displayResults(data);
+                results.classList.remove('hidden');
+                
+                // Initialize all sections as expanded
+                Object.keys(sectionStates).forEach(sectionId => {
+                    const section = document.getElementById(sectionId);
+                    if (section) {
+                        section.classList.add('expanded');
+                    }
+                });
+
+                displayTemplates(data.suggested_templates);
+                updatePreview();
+            } catch (err) {
+                error.textContent = err.message;
+                error.classList.remove('hidden');
+            } finally {
+                loading.classList.add('hidden');
+            }
+        }
+
+        function displayResults(data) {
+            // Basic Info
+            document.getElementById('basicInfo').innerHTML = `
+                <div class="bg-gray-50 p-6 rounded-xl">
+                    <p class="text-lg"><span class="font-semibold text-gray-700">Title:</span> ${data.title}</p>
+                </div>
+            `;
+
+            // Meta Tags
+            document.getElementById('metaTags').innerHTML = data.meta
+                .map(meta => `
+                    <div class="bg-gray-50 p-6 rounded-xl">
+                        <p class="text-lg"><span class="font-semibold text-gray-700">${meta.name || 'Unnamed'}:</span> ${meta.content || 'No content'}</p>
+                    </div>
+                `)
+                .join('');
+
+            // Links
+            document.getElementById('links').innerHTML = data.links
+                .map(link => `
+                    <div class="bg-gray-50 p-6 rounded-xl hover:bg-gray-100 transition-colors duration-300">
+                        <a href="${link.href}" target="_blank" class="text-lg text-blue-600 hover:text-blue-800 hover:underline">${link.text || link.href}</a>
+                    </div>
+                `)
+                .join('');
+
+            // Scripts
+            document.getElementById('scripts').innerHTML = data.scripts
+                .map(script => `
+                    <div class="bg-gray-50 p-6 rounded-xl hover:bg-gray-100 transition-colors duration-300">
+                        <a href="${script}" target="_blank" class="text-lg text-blue-600 hover:text-blue-800 hover:underline">${script}</a>
+                    </div>
+                `)
+                .join('');
+
+            // Styles
+            document.getElementById('styles').innerHTML = data.styles
+                .map(style => `
+                    <div class="bg-gray-50 p-6 rounded-xl hover:bg-gray-100 transition-colors duration-300">
+                        <a href="${style}" target="_blank" class="text-lg text-blue-600 hover:text-blue-800 hover:underline">${style}</a>
+                    </div>
+                `)
+                .join('');
+
+            // Images
+            document.getElementById('images').innerHTML = data.images
+                .map(img => `
+                    <div class="relative group">
+                        <div class="bg-gray-50 rounded-xl overflow-hidden">
+                            <img src="${img}" alt="Website image" 
+                                 class="w-full h-48 object-cover transform group-hover:scale-105 transition-transform duration-300"
+                                 onerror="this.onerror=null; this.src='/static/images/placeholder.png'; this.alt='Image failed to load'">
+                            <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-300 rounded-xl flex items-center justify-center">
+                                <a href="${img}" target="_blank" class="text-white opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 px-4 py-2 bg-blue-500 rounded-lg hover:bg-blue-600">
+                                    View Full Size
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `)
+                .join('');
+
+            // Templates
+            const templatesList = document.getElementById('templatesList');
+            templatesList.innerHTML = data.suggested_templates
+                .map(template => `
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden transform hover:scale-[1.02] transition-transform duration-300">
+                        <div class="relative">
+                            <img src="${template.preview_url}" alt="${template.name}" 
+                                 class="w-full h-48 object-cover"
+                                 onerror="this.onerror=null; this.src='https://via.placeholder.com/800x400?text=Template+Preview'; this.alt='Template preview failed to load'">
+                            <div class="absolute top-0 right-0 bg-blue-500 text-white px-3 py-1 rounded-bl-lg">
+                                Score: ${template.score}
+                            </div>
+                        </div>
+                        <div class="p-6">
+                            <h3 class="text-xl font-semibold text-gray-800 mb-2">${template.name}</h3>
+                            <p class="text-gray-600 mb-4">${template.description}</p>
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                ${template.components.map(comp => `
+                                    <span class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+                                        ${comp}
+                                    </span>
+                                `).join('')}
+                            </div>
+                            <button onclick="applyTemplate('${template.id}')" 
+                                    class="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-300">
+                                Apply Template
+                            </button>
+                        </div>
+                    </div>
+                `)
+                .join('');
+        }
+
+        function displayTemplates(templates) {
+            const templatesContainer = document.getElementById('templatesList');
+            if (!templatesContainer) return;
+
+            templatesContainer.innerHTML = templates
+                .map(template => `
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden transform hover:scale-[1.02] transition-transform duration-300">
+                        <div class="relative">
+                            <img src="${template.preview_url}" alt="${template.name}" 
+                                 class="w-full h-48 object-cover"
+                                 onerror="this.onerror=null; this.src='https://via.placeholder.com/800x400?text=Template+Preview'; this.alt='Template preview failed to load'">
+                            <div class="absolute top-0 right-0 bg-blue-500 text-white px-3 py-1 rounded-bl-lg">
+                                Score: ${template.score}
+                            </div>
+                        </div>
+                        <div class="p-6">
+                            <h3 class="text-xl font-semibold text-gray-800 mb-2">${template.name}</h3>
+                            <p class="text-gray-600 mb-4">${template.description}</p>
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                ${template.components.map(comp => `
+                                    <span class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+                                        ${comp}
+                                    </span>
+                                `).join('')}
+                            </div>
+                            <button onclick="applyTemplate('${template.id}')" 
+                                    class="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-300">
+                                Apply Template
+                            </button>
+                        </div>
+                    </div>
+                `)
+                .join('');
+        }
+
+        function applyTemplate(templateId) {
+            if (!currentHtml || !currentCss) {
+                alert('Please parse a website first');
+                return;
+            }
+
+            fetch('/apply_template', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    html: currentHtml,
+                    css: currentCss,
+                    template_id: templateId
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                // Update the current HTML and CSS
+                currentHtml = data.html;
+                currentCss = data.css;
+                
+                // Force update the preview
+                updatePreview();
+                
+                // Log the changes for debugging
+                console.log('Template applied successfully');
+                console.log('New HTML length:', currentHtml.length);
+                console.log('New CSS length:', currentCss.length);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error applying template: ' + error.message);
+            });
+        }
+
+        function updatePreview() {
+            const previewFrame = document.getElementById('previewFrame');
+            if (!previewFrame) return;
+
+            const previewDocument = previewFrame.contentDocument || previewFrame.contentWindow.document;
+            
+            // Clear the previous content
+            previewDocument.open();
+            
+            // Create a complete HTML document with the current content
+            previewDocument.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        ${currentCss}
+                        /* Add some basic styles to ensure content is visible */
+                        body {
+                            margin: 0;
+                            padding: 20px;
+                            font-family: Arial, sans-serif;
+                        }
+                        img {
+                            max-width: 100%;
+                            height: auto;
+                    <style>${currentCss}</style>
+                </head>
+                <body>${currentHtml}</body>
+                </html>
+            `);
+            previewDocument.close();
+        }
+
+        function toggleMaximize() {
+            const container = document.getElementById('previewContainer');
+            if (container) {
+                container.classList.toggle('maximized');
+            }
+        }
+
+        function sendMessage() {
+            const chatInput = document.getElementById('chatInput');
+            const chatMessages = document.getElementById('chatMessages');
+            const message = chatInput.value.trim();
+
+            if (message) {
+                // Add user message
+                chatMessages.innerHTML += `
+                    <div class="user-message p-4 max-w-full">
+                        <div class="message-content">${message}</div>
+                    </div>
+                `;
+
+                // Add loading indicator
+                const loadingId = 'loading-' + Date.now();
+                chatMessages.innerHTML += `
+                    <div id="${loadingId}" class="assistant-message p-4">
+                        <div class="flex space-x-2">
+                            <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                            <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                            <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                        </div>
+                    </div>
+                `;
+
+                // Clear input
+                chatInput.value = '';
+
+                // Scroll to bottom
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                // Get current code state
+                const currentCode = {
+                    html: document.getElementById('sourceContent').textContent || '',
+                    css: '',
+                    js: ''
+                };
+
+                // Send message to API
+                fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        currentCode: currentCode
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Remove loading indicator
+                    const loadingElement = document.getElementById(loadingId);
+                    if (loadingElement) {
+                        loadingElement.remove();
+                    }
+
+                    // Format code blocks in the message
+                    let formattedMessage = data.message;
+                    if (data.suggestedChanges) {
+                        for (const [lang, code] of Object.entries(data.suggestedChanges)) {
+                            formattedMessage = formattedMessage.replace(
+                                new RegExp('```' + lang + '\\n[\\s\\S]*?```'),
+                                `<div class="code-block" data-language="${lang}"><pre><code>${code}</code></pre></div>`
+                            );
+                        }
+                    }
+
+                    // Add AI response
+                    chatMessages.innerHTML += `
+                        <div class="assistant-message p-4 max-w-full">
+                            <div class="message-content">${formattedMessage}</div>
+                        </div>
+                    `;
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                })
+                .catch(error => {
+                    // Remove loading indicator
+                    const loadingElement = document.getElementById(loadingId);
+                    if (loadingElement) {
+                        loadingElement.remove();
+                    }
+
+                    console.error('Error:', error);
+                    chatMessages.innerHTML += `
+                        <div class="assistant-message p-4 max-w-full bg-red-50">
+                            <div class="message-content text-red-800">
+                                Sorry, there was an error processing your request. Please try again.
+                            </div>
+                        </div>
+                    `;
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                });
+            }
+        }
+
+        // Allow sending message with Enter key
+        document.getElementById('chatInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Add event listeners when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add click handler for the parse button
+            const parseButton = document.querySelector('button[onclick="parseWebsite()"]');
+            if (parseButton) {
+                parseButton.addEventListener('click', parseWebsite);
+            }
+
+            // Add keypress handler for the URL input
+            const urlInput = document.getElementById('urlInput');
+            if (urlInput) {
+                urlInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        parseWebsite();
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html> 
